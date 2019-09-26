@@ -1,5 +1,5 @@
 # Laura Goyeneche
-# August 31, 2018
+# September 27, 2018
 # HW1 R Shiny 
 # -------------------------------------------------------------------
 
@@ -7,15 +7,21 @@
 library(shiny)
 library(shinydashboard)
 
+# User interface
+# -------------------------------------------------------------------
 ui <- dashboardPage(
     dashboardHeader(),
     dashboardSidebar(),
     dashboardBody()
 )
 
-
+# Server function
+# -------------------------------------------------------------------
 server <- function(input, output) {
 
 }
 
+# Run app
+# -------------------------------------------------------------------
 shinyApp(ui = ui, server = server)
+# -------------------------------------------------------------------
