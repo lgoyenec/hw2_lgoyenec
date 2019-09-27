@@ -38,12 +38,12 @@ source("convertMenuItem.R")
 ui = 
   dashboardPage(
     skin = "blue",
-    dashboardHeader(title = HTML("<a href=http://www.odc.gov.co/><font color=white>Observatory of drugs</font></a>")),
+    dashboardHeader(title = HTML("<a href=http://www.odc.gov.co/><font color=white>Observatory of Drugs</font></a>")),
     dashboardSidebar(
       sidebarMenu(
         id = "tabs",
         convertMenuItem(
-          menuItem("Supply", 
+          menuItem("Colombian Supply", 
                    tabName = "supply", 
                    icon = icon("seedling"),
                    startExpanded = T,
@@ -58,32 +58,16 @@ ui =
           ), "supply"
         ),
         convertMenuItem(
-          menuItem("Consumption", 
-                   tabName = "demand", 
-                   icon = icon("user-astronaut"),
-                   checkboxGroupInput("input2",
-                                      "Substance",
-                                      choices  = c("Marihuana","Cocaine","Heroin"),
-                                      selected = "Cocaine"),
-                   radioButtons("button1",
-                                "Year of epidemiological study",
-                                choices  = c(2008, 2013),
-                                selected = 2013)
-          ), "demand"
-        ),
-        convertMenuItem(
-          menuItem('Criminality', 
+          menuItem('Colombian Crime', 
                    tabName = "criminality", 
                    icon = icon("skull"),
                    radioButtons("button2",
-                                "Gender",
-                                choices  = c("Total","Male","Female")),
-                   radioButtons("button3",
-                                "Judicial situation",
-                                choices = c("Convicted or Accused","Convicted", "Accused"))
+                                "Analysis by Gender or Judicial situation",
+                                choices  = c("Gender","Judicial situation"),
+                                selected = "Gender")
           ), "criminality"
         ),
-        menuItem('Data set',
+        menuItem('Data',
                  tabName = "data",
                  icon = icon("table"))
       )
@@ -101,7 +85,16 @@ ui =
           )
         ),
         tabItem(tabName = "demand",h2("Y")),
-        tabItem(tabName = "criminality",h2("Z")),
+        tabItem(
+          tabName = "criminality",
+          fluidRow(
+            valueBoxOutput("vB3", width = 6),
+            valueBoxOutput("vB4", width = 6)
+          ),
+          fluidRow(
+            box(plotlyOutput("plot2"), width = 12)
+          )
+        ),
         tabItem(
           tabName = "data",
           tabsetPanel(
@@ -109,8 +102,7 @@ ui =
             tabPanel("Illicit Crops"     , br(), DT::dataTableOutput("table1")),
             tabPanel("Manual Eradication", br(), DT::dataTableOutput("table2")),
             tabPanel("Seizures"          , br(), DT::dataTableOutput("table3")),
-            tabPanel("Consumption"       , br(), DT::dataTableOutput("table4")),
-            tabPanel("Criminality"       , br(), DT::dataTableOutput("table5"))
+            tabPanel("Criminality"       , br(), DT::dataTableOutput("table4"))
           )
         )
       )
@@ -123,64 +115,97 @@ server = function(input, output) {
   
   # Select variables of datasets as reactive objects
   # -----------------------------------------------------------------
-  dt_crops = reactive({data = crops %>% filter(Year >= input$slider1[1] & Year <= input$slider1[2])})
+  dt_crops = reactive({data = crops       %>% filter(Year >= input$slider1[1] & Year <= input$slider1[2])})
   dt_eradi = reactive({data = eradication %>% filter(Year >= input$slider1[1] & Year <= input$slider1[2])})
-  dt_seizu = reactive({data = seizures %>% filter(Year >= input$slider1[1] & Year <= input$slider1[2])} %>% select(-Sustancia))
+  dt_seizu = reactive({data = seizures    %>% filter(Year >= input$slider1[1] & Year <= input$slider1[2]) %>% select(-Sustancia)})
   dt_deman = reactive({})
-  dt_crime = reactive({})
+  dt_crime = reactive({data = crime       %>% filter(if (input$button2 == "Gender") Group == 2 else Group == 1 ) %>%
+                                              mutate(Percent = round(Total*100/sum(Total),2)) %>%
+                                              select(-Tema, - Desagregacion)})
   
   # Supply
   # -----------------------------------------------------------------
-  
-  # Select values for valueBox
-  
   observe({
-    if (input$input1 == "A") {
+    if (input$input1 == "A"){
       # Illicit crops of cocaine (hectares)
       # -------------------------------------------------------------
-      output$vB1 = renderValueBox({
-        dt_crops() %>%
-          filter(Total == max(Total)) %>%
-          valueBox(~Year,
-                   p(strong(
-                     paste("presented the highest number of illicit crops of cocaine", ~Total))),
-                   icon = icon("globe-americas"),
-                   color = "teal"
-                   )
-      })
-      
-      output$plot1 = 
-        renderPlotly({
-          dt_crops() %>% 
-            plot_ly(x =~ Year, y =~ Total, type = "scatter", mode = "lines+markers")
-        })
+      data    = dt_crops()
+      textvb1 = "presented the highest number of illicit crops of cocaine"
+      textvb2 = "increased the illicit crops of coca between"
     } else if (input$input1 == "B") {
       # Manual eradication (hectares)
       # -------------------------------------------------------------
-      output$plot1 = 
-        renderPlotly({
-          dt_eradi() %>% 
-            plot_ly(x =~ Year, y =~ Total, type = "scatter", mode = "lines+markers")
-        })
+      data = dt_eradi()
+      textvb1 = "presented the highest number of hectares of coca eradicated"
+      textvb2 = "increased the hectares of coca eradicated between"
     } else {
       # Seizures (Kg)
       # -------------------------------------------------------------
-      output$plot1 = 
-        renderPlotly({
-          dt_seizu() %>% 
-            plot_ly(x =~ Year, y =~ Total, type = "scatter", mode = "lines+markers", linetype =~ Substance)
-        })
+      data = dt_seizu()
+      textvb1 = "presented the highest number of seizures"
+      textvb2 = "increased the kg of seizures"
     }
+    
+    output$vB1 = renderValueBox({
+      value = data %>% filter(Total == max(Total)) %>% as.numeric()
+      valueBox(value[1], textvb1, color = "yellow")
+    })
+    
+    output$vB2 = renderValueBox({
+      value = round((data[nrow(data),2]/data[1,2])-1,2)
+      years = c(min(data[,1]), max(data[,1]))
+      valueBox(paste(value,"%"), paste(textvb2, years[1], "and", years[2]), color = "yellow")
+    })
+    
+    observe({
+      if(nrow(data) == (input$slider1[2]-input$slider1[1] + 1)){
+        value = data %>% filter(Total == max(Total)) %>% as.numeric()
+        output$plot1 = renderPlotly({
+          data %>%
+            filter(Total != max(Total)) %>%
+            plot_ly(x =~ Year, y =~ Total, type = "bar") %>%
+            add_bars(x = value[1], y = value[2], showlegend = F)
+        })
+      } else {
+        output$plot1 = renderPlotly({
+          data %>% 
+            plot_ly(x =~ Year, y =~ Total, type = "scatter", mode = "lines+markers", linetype =~ Substance) %>%
+            layout(yaxis = list(range = c(0, max(data[,2])*1.5)), 
+                   legend = list(x = 0.3, y = 1, orientation = "h"))
+        })
+      }
+    })
   })
   
-
+  # Criminality
+  # -----------------------------------------------------------------
+  output$vB3 = renderValueBox({
+    value = dt_crime() %>% filter(g_cat == 1) %>% summarise(n = sum(Percent)) %>% as.numeric()
+    text  = dt_crime() %>% filter(g_cat == 1) %>% select(Category) %>% unique() %>% as.character()
+    valueBox(paste(value,"%"), text, color = "teal")
+  })
+  
+  output$vB4 = renderValueBox({
+    value = dt_crime() %>% filter(g_cat == 2) %>% summarise(n = sum(Percent)) %>% as.numeric()
+    text  = dt_crime() %>% filter(g_cat == 2) %>% select(Category) %>% unique() %>% as.character()
+    valueBox(paste(value,"%"), text, color = "teal")
+  })
+  
+  output$plot2 = renderPlotly({
+    dt_crime() %>%
+      plot_ly() %>%
+      add_bars(y =~ Percent, x =~ Category, color =~ Crime, type = "bar", width = 0.4) %>%
+      layout(yaxis = list(range = c(0,140)),
+             legend = list(x = 0.1, y = 1), 
+             barmode = 'stack')
+  })
+  
   # Data tables based on filters
   # -----------------------------------------------------------------
   output$table1 = DT::renderDataTable({DT::datatable(dt_crops(), options = list(pageLength = 10), rownames = F)})
   output$table2 = DT::renderDataTable({DT::datatable(dt_eradi(), options = list(pageLength = 10), rownames = F)})
   output$table3 = DT::renderDataTable({DT::datatable(dt_seizu(), options = list(pageLength = 10), rownames = F)})
-  output$table4 = DT::renderDataTable({DT::datatable(dt_deman(), options = list(pageLength = 10), rownames = F)})
-  output$table5 = DT::renderDataTable({DT::datatable(dt_crime(), options = list(pageLength = 10), rownames = F)})
+  output$table4 = DT::renderDataTable({DT::datatable(dt_crime(), options = list(pageLength = 10), rownames = F)})
   
 }
 
