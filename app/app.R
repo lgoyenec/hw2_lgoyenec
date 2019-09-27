@@ -16,17 +16,16 @@ library(plotly)
 
 # Working directory
 # -------------------------------------------------------------------
-cd = "C:/Users/lgoye/OneDrive/Documents/GitHub/project1_lgoyenec"
-setwd(cd)
+#cd = "C:/Users/lgoye/OneDrive/Documents/GitHub/project1_lgoyenec/app"
+#setwd(cd)
 
 # Data 
 # -------------------------------------------------------------------
-cd_data     = paste0(cd,"/data_xls/obs_drug_colombia.xlsx")
+cd_data     = "obs_drug_colombia.xlsx"
 
 crops       = read_excel(cd_data, sheet = "illicit_crops")
 eradication = read_excel(cd_data, sheet = "manual_eradication")
 seizures    = read_excel(cd_data, sheet = "seizures")
-demand      = c()
 crime       = read_excel(cd_data, sheet = "criminality")
 
 # Function for conditional menu item
@@ -69,7 +68,20 @@ ui =
         ),
         menuItem('Data',
                  tabName = "data",
-                 icon = icon("table"))
+                 icon = icon("table")),
+        br(),
+        br(),
+        p(strong("Laura Goyeneche"), br(),
+          em("MSPPM-Data Analytics '20", style = "font-size:11px"), br(),
+          em("Carnegie Mellon University", style = "font-size:11px"), br(),
+          strong(em("lgoyenec@andrew.cmu.edu", style = "font-size:10px")), br(),
+          a("https://github.com/lgoyenec/hw1_lgoyenec", 
+            href = "https://github.com/lgoyenec/project1_lgoyenec",
+            style = "font-size:10px"),
+          style = "font-size:12px"),
+        br(),
+        p(strong("Source:"), "Observatory of Drugs in Colombia", style = "font-size:11px"),
+        br()
       )
     ),
     dashboardBody(
@@ -84,7 +96,6 @@ ui =
             box(plotlyOutput("plot1"), width = 12)
           )
         ),
-        tabItem(tabName = "demand",h2("Y")),
         tabItem(
           tabName = "criminality",
           fluidRow(
@@ -132,18 +143,21 @@ server = function(input, output) {
       data    = dt_crops()
       textvb1 = "presented the highest number of illicit crops of cocaine"
       textvb2 = "increased the illicit crops of coca between"
+      titleP  = "Illicit crops of cocaine (hectares)"
     } else if (input$input1 == "B") {
       # Manual eradication (hectares)
       # -------------------------------------------------------------
       data = dt_eradi()
       textvb1 = "presented the highest number of hectares of coca eradicated"
       textvb2 = "increased the hectares of coca eradicated between"
+      titleP  = "Manual eradication (hectares)"
     } else {
       # Seizures (Kg)
       # -------------------------------------------------------------
       data = dt_seizu()
       textvb1 = "presented the highest number of seizures"
       textvb2 = "increased the kg of seizures"
+      titleP  = "Seizures (Kg)"
     }
     
     output$vB1 = renderValueBox({
@@ -159,18 +173,20 @@ server = function(input, output) {
     
     observe({
       if(nrow(data) == (input$slider1[2]-input$slider1[1] + 1)){
-        value = data %>% filter(Total == max(Total)) %>% as.numeric()
+        value  = data %>% filter(Total == max(Total)) %>% as.numeric()
         output$plot1 = renderPlotly({
           data %>%
             filter(Total != max(Total)) %>%
             plot_ly(x =~ Year, y =~ Total, type = "bar") %>%
-            add_bars(x = value[1], y = value[2], showlegend = F)
+            add_bars(x = value[1], y = value[2], showlegend = F) %>%
+            layout(title = titleP)
         })
       } else {
         output$plot1 = renderPlotly({
           data %>% 
             plot_ly(x =~ Year, y =~ Total, type = "scatter", mode = "lines+markers", linetype =~ Substance) %>%
-            layout(yaxis = list(range = c(0, max(data[,2])*1.5)), 
+            layout(title = titleP,
+                   yaxis = list(range = c(0, max(data[,2])*1.5)), 
                    legend = list(x = 0.3, y = 1, orientation = "h"))
         })
       }
@@ -192,10 +208,12 @@ server = function(input, output) {
   })
   
   output$plot2 = renderPlotly({
+    text  = ifelse(input$button2 == "Gender","Gender","Judicial situation")
     dt_crime() %>%
       plot_ly() %>%
       add_bars(y =~ Percent, x =~ Category, color =~ Crime, type = "bar", width = 0.4) %>%
-      layout(yaxis = list(range = c(0,140)),
+      layout(title = paste("Crimes related with illicit drug (2018) by",text),
+             yaxis = list(range = c(0,140)),
              legend = list(x = 0.1, y = 1), 
              barmode = 'stack')
   })

@@ -1,0 +1,12 @@
+name: observatoryDrugsColombia
+title: observatoryDrugsColombia
+username:
+account: lgoyenec
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 1255809
+bundleId: 2450412
+url: https://lgoyenec.shinyapps.io/observatoryDrugsColombia/
+when: 1569610552.03201
+asMultiple: FALSE
+asStatic: FALSE
